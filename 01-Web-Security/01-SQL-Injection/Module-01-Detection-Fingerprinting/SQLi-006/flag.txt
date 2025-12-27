@@ -1,0 +1,1 @@
+FLAG{v3rs10n_qu3ry_p0stgr3sql_1d3nt1f13d}
