@@ -1,0 +1,1 @@
+FLAG{t1m3_b4s3d_mssql_f1ng3rpr1nt}
