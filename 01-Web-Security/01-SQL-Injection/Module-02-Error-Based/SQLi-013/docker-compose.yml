@@ -1,0 +1,18 @@
+version: '3.8'
+services:
+  web:
+    build: ./src
+    ports: [ "5013:5000" ]
+    environment: [ MSSQL_HOST=db, MSSQL_USER=sa, MSSQL_PASSWORD=YourStrong@Passw0rd, MSSQL_DATABASE=empdb ]
+    depends_on: { db: { condition: service_healthy } }
+    networks: [ sqli-net ]
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment: [ ACCEPT_EULA=Y, MSSQL_SA_PASSWORD=YourStrong@Passw0rd ]
+    volumes: [ "./init.sql:/init.sql", "./setup.sh:/setup.sh" ]
+    healthcheck: { test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -Q "SELECT 1" -C || exit 1, interval: 10s, timeout: 5s, retries: 5, start_period: 30s }
+    command: >
+      /bin/bash -c " /opt/mssql/bin/sqlservr & sleep 30 && /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -i /init.sql -C && wait "
+    networks: [ sqli-net ]
+networks:
+  sqli-net: { driver: bridge }

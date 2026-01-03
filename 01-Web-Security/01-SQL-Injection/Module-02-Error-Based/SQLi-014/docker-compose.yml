@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  web:
+    build: ./src
+    ports: [ "5014:5000" ]
+    environment: [ ORACLE_HOST=db, ORACLE_PORT=1521, ORACLE_SERVICE=XEPDB1, ORACLE_USER=app_user, ORACLE_PASSWORD=app_password ]
+    depends_on: { db: { condition: service_healthy } }
+    networks: [ sqli-net ]
+  db:
+    image: gvenzl/oracle-xe:21-slim
+    environment: [ ORACLE_PASSWORD=oracle, APP_USER=app_user, APP_USER_PASSWORD=app_password ]
+    volumes: [ "./init.sql:/container-entrypoint-initdb.d/init.sql" ]
+    healthcheck: { test: [ "CMD", "healthcheck.sh" ], interval: 30s, timeout: 10s, retries: 10, start_period: 120s }
+    networks: [ sqli-net ]
+networks:
+  sqli-net: { driver: bridge }

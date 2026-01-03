@@ -1,0 +1,1 @@
+FLAG{b00l34n_bl1nd_substr1ng}

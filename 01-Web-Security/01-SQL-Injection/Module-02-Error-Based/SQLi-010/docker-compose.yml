@@ -1,0 +1,35 @@
+version: '3.8'
+services:
+  web:
+    build: ./src
+    ports:
+      - "5010:5000"
+    environment:
+      - MYSQL_HOST=db
+      - MYSQL_USER=app_user
+      - MYSQL_PASSWORD=app_password
+      - MYSQL_DATABASE=userdb
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - sqli-net
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=userdb
+      - MYSQL_USER=app_user
+      - MYSQL_PASSWORD=app_password
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sqli-net
+networks:
+  sqli-net:
+    driver: bridge
