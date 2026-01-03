@@ -60,12 +60,13 @@ def product():
         cursor = conn.cursor()
         # VULNERABLE: Time-based blind - no output difference
         sql = f"SELECT name, price FROM products WHERE id = {pid}"
+        print(f"[DEBUG] Executing SQL: {sql}", flush=True)
         cursor.execute(sql)
         cursor.fetchone()  # Result ignored - same response always
         cursor.close()
         conn.close()
-    except:
-        pass
+    except Exception as e:
+        print(f"[ERROR] {type(e).__name__}: {e}", flush=True)
     
     # Always return same response - only time differs
     return render_template_string(TEMPLATE)

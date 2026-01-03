@@ -25,12 +25,13 @@ def index():
         cursor = conn.cursor()
         # VULNERABLE: User-Agent in SQL
         sql = f"INSERT INTO visitors (user_agent, ip_address) VALUES ('{user_agent}', '{ip}')"
+        print(f"[DEBUG] SQL: {sql}", flush=True)
         cursor.execute(sql)
         conn.commit()
         cursor.close()
         conn.close()
-    except:
-        pass
+    except Exception as e:
+        print(f"[ERROR] {e}", flush=True)
     
     return '<h1>Bot Detection</h1><p>Lab: PostgreSQL Time-based via User-Agent</p>'
 
