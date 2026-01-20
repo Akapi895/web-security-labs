@@ -1,5 +1,7 @@
 # SQL Injection Lab Roadmap
 
+> Mới làm đến module 7 (chưa hoàn thiện)
+
 ## 📋 Tổng Quan
 
 Lab Roadmap này được thiết kế dựa trên kiến thức từ Knowledge Base, bao gồm tất cả các kỹ thuật SQLi từ cơ bản đến nâng cao với đa dạng kịch bản và DBMS.
@@ -36,17 +38,16 @@ Các lab sẽ luân phiên sử dụng 5 loại DBMS:
 
 > **Mục tiêu**: Học cách phát hiện lỗ hổng SQLi và xác định loại DBMS
 
-| Lab ID   | Sub-Topic      | DBMS       | Scenario/Context                   | Learning Objective                                                  | Complexity      |
-| -------- | -------------- | ---------- | ---------------------------------- | ------------------------------------------------------------------- | --------------- | ----------------- | --------------- |
-| SQLi-001 | Detection      | MySQL      | Chức năng Search sản phẩm          | Phát hiện SQLi bằng quote-based test (`'`, `"`)                     | ⭐ Dễ           |
-| SQLi-002 | Detection      | PostgreSQL | Chức năng Filter theo Category     | Phát hiện SQLi bằng logic test (`OR 1=1`, `AND 1=2`)                | ⭐ Dễ           |
-| SQLi-003 | Detection      | MSSQL      | Trang View Profile                 | Phát hiện SQLi bằng arithmetic test (`1/0`, `1/1`)                  | ⭐ Dễ           |
-| SQLi-004 | Detection      | Oracle     | API lấy thông tin sản phẩm theo ID | Phát hiện SQLi bằng comment test (`--`, `#`, `/**/`)                | ⭐ Dễ           |
-| SQLi-005 | Fingerprinting | MySQL      | Search box với error messages      | Xác định DBMS qua error message patterns                            | ⭐⭐ Trung bình |
-| SQLi-006 | Fingerprinting | PostgreSQL | Login form với verbose errors      | Xác định DBMS qua version queries (`@@version`, `version()`)        | ⭐⭐ Trung bình |
-| SQLi-007 | Fingerprinting | MSSQL      | REST API endpoint                  | Xác định DBMS qua time-based (`SLEEP`, `WAITFOR DELAY`, `pg_sleep`) | ⭐⭐ Trung bình |
-| SQLi-008 | Fingerprinting | Oracle     | Web service với XML input          | Xác định DBMS qua string concatenation (`                           |                 | `, `+`, `CONCAT`) | ⭐⭐ Trung bình |
-
+| Lab ID | Sub-Topic | DBMS | Scenario/Context | Learning Objective | Complexity |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| SQLi-001 | Detection | MySQL | Chức năng Search sản phẩm | Phát hiện SQLi bằng quote-based test (`'`, `"`) | ⭐ Dễ |
+| SQLi-002 | Detection | PostgreSQL | Chức năng Filter theo Category | Phát hiện SQLi bằng logic test (`OR 1=1`, `AND 1=2`) | ⭐ Dễ |
+| SQLi-003 | Detection | MSSQL | Trang View Profile | Phát hiện SQLi bằng arithmetic test (`1/0`, `1/1`) | ⭐ Dễ |
+| SQLi-004 | Detection | Oracle | API lấy thông tin sản phẩm theo ID | Phát hiện SQLi bằng comment test (`--`, `#`, `/**/`) | ⭐ Dễ |
+| SQLi-005 | Fingerprinting | MySQL | Search box với error messages | Xác định DBMS qua error message patterns | ⭐⭐ Trung bình |
+| SQLi-006 | Fingerprinting | PostgreSQL | Login form với verbose errors | Xác định DBMS qua version queries (`@@version`, `version()`) | ⭐⭐ Trung bình |
+| SQLi-007 | Fingerprinting | MSSQL | REST API endpoint | Xác định DBMS qua time-based (`SLEEP`, `WAITFOR DELAY`, `pg_sleep`) | ⭐⭐ Trung bình |
+| SQLi-008 | Fingerprinting | Oracle | Web service với XML input | Xác định DBMS qua string concatenation (`\|\|`, `+`, `CONCAT`) | ⭐⭐ Trung bình |
 ---
 
 ## 💥 Module 2: Error-based SQL Injection

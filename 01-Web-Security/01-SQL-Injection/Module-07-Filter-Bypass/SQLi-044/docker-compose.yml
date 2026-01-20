@@ -1,0 +1,33 @@
+version: '3.8'
+services:
+  web:
+    build: ./src
+    ports: [ "5044:5000" ]
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DATABASE=apidb
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [ sqli-net ]
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=apidb
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [ sqli-net ]
+
+networks:
+  sqli-net:
+    driver: bridge

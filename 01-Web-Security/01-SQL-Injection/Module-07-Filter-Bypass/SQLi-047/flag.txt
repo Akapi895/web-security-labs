@@ -1,0 +1,1 @@
+FLAG{mssql_d0ubl3_k3yw0rd_byp4ss}
