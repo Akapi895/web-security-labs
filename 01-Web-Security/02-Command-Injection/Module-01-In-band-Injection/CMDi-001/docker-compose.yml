@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  web:
+    build: ./src
+    ports:
+      - "5101:80"
+    volumes:
+      - ./flag.txt:/flag.txt:ro
+    networks:
+      - cmdi-net
+
+networks:
+  cmdi-net:
+    driver: bridge
