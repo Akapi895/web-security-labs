@@ -1,0 +1,36 @@
+# Workspace / editor
+.vscode/
+.vscode-test/
+.idea/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary and backup files
+.tmp/
+*.tmp
+*.log
+*.bak
+*.old
+*.orig
+*.swp
+*.swo
+*~
+
+# Security tooling artifacts
+*.burp
+burp*.xml
+burp*.json
+
+# Local caches / databases
+.cache/
+*.db
+*.sqlite
+*.sqlite3
+
+# Build outputs that may appear later
+dist/
+build/
+coverage/
